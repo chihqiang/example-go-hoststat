@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>仪表盘</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@6.0.0/dist/echarts.min.js"></script>
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        #errorAlert {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+            min-width: 300px;
+        }
+
+        .card {
+            margin-bottom: 20px;
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+        }
+
+        .card-header {
+            background-color: #fff;
+            border-bottom: 1px solid #e9ecef;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .sub-chart {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+        }
+
+        .sub-chart .echarts-container {
+            max-width: 120px;
+            height: 120px;
+            margin: 0 auto 10px;
+        }
+
+        .sub-chart p {
+            margin: 0;
+            font-weight: 500;
+            color: #6c757d;
+        }
+
+        /* 折线图容器样式 */
+        #trafficChart.echarts-container,
+        #diskIOChart.echarts-container {
+            height: 300px;
+            max-width: 100%;
+        }
+
+        @media (max-width: 767px) {
+            .sub-chart .echarts-container {
+                max-width: 100px;
+                height: 100px;
+            }
+
+            .row > div[class^="col-md-3"] {
+                margin-bottom: 10px;
+            }
+
+            #trafficChart.echarts-container,
+            #diskIOChart.echarts-container {
+                height: 150px !important;
+            }
+        }
+
+        /* 磁盘表格样式 */
+        #diskTable {
+            font-size: 0.9rem;
+        }
+
+        #diskTable th {
+            background-color: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+            font-weight: 600;
+        }
+
+        #diskTable tr:hover {
+            background-color: #f1f3f5;
+        }
+
+        /* 进度条样式 */
+        .progress-sm {
+            height: 18px;
+            font-size: 0.7rem;
+            line-height: 18px;
+        }
+
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+
+        /* 根据使用率显示不同颜色 */
+        .progress-bar {
+            background-color: #6c757d;
+        }
+
+        .progress-bar[data-usage="low"] {
+            background-color: #28a745;
+        }
+
+        .progress-bar[data-usage="medium"] {
+            background-color: #ffc107;
+        }
+
+        .progress-bar[data-usage="high"] {
+            background-color: #dc3545;
+        }
+
+        /* 表格响应式调整 */
+        @media (max-width: 767px) {
+            #diskTable {
+                font-size: 0.8rem;
+            }
+
+            .progress-sm {
+                height: 16px;
+                font-size: 0.65rem;
+                line-height: 16px;
+            }
+        }
+
+        @media (max-width: 575px) {
+            .table {
+                font-size: 0.875rem;
+            }
+
+            .card-header {
+                font-size: 1.1rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<div id="errorAlert" class="alert alert-danger alert-dismissible fade show d-none" role="alert">
+    <strong>错误!</strong> <span id="errorMessage">发生了一些问题</span>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+
+<div class="container">
+    <!-- 服务器基本信息 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header">服务器基本信息</div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3"><strong>主机名:</strong> <span id="hostname">-</span></div>
+                        <div class="col-md-3"><strong>IP 地址:</strong> <span id="ipAddr">-</span></div>
+                        <div class="col-md-3"><strong>操作系统:</strong> <span id="os">-</span></div>
+                        <div class="col-md-3"><strong>平台版本:</strong> <span id="platformVersion">-</span></div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-md-3"><strong>内核版本:</strong> <span id="kernelVersion">-</span></div>
+                        <div class="col-md-3"><strong>内核架构:</strong> <span id="kernelArch">-</span></div>
+                        <div class="col-md-3"><strong>在线时间:</strong> <span id="uptime">-</span></div>
+                        <div class="col-md-3"><strong>系统代理:</strong> <span id="systemProxy">-</span></div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-md-3"><strong>CPU型号:</strong> <span id="cpuModelName">-</span></div>
+                        <div class="col-md-3"><strong>物理核心:</strong> <span id="cpuCores">-</span></div>
+                        <div class="col-md-3"><strong>逻辑核心:</strong> <span id="cpuLogicalCores">-</span></div>
+                        <div class="col-md-3"><strong>CPU主频:</strong> <span id="cpuMhz">-</span> MHz</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 实时状态概览 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header">实时状态概览</div>
+                <div class="card-body">
+                    <div class="row justify-content-center">
+                        <div class="col-md-3 sub-chart">
+                            <div id="processChart" class="echarts-container"></div>
+                            <p>负载</p>
+                        </div>
+                        <div class="col-md-3 sub-chart">
+                            <div id="cpuChart" class="echarts-container"></div>
+                            <p>CPU使用率</p>
+                        </div>
+                        <div class="col-md-3 sub-chart">
+                            <div id="memoryChart" class="echarts-container"></div>
+                            <p>内存使用率</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 磁盘信息 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header">磁盘信息</div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="diskTable">
+                            <thead>
+                            <tr>
+                                <th>设备名称</th>
+                                <th>文件系统</th>
+                                <th>挂载路径</th>
+                                <th>总容量</th>
+                                <th>已用空间</th>
+                                <th>可用空间</th>
+                                <th>使用率</th>
+                                <th>Inode使用率</th>
+                            </tr>
+                            </thead>
+                            <tbody id="diskTableBody">
+                            <tr>
+                                <td colspan="8" class="text-center">加载中...</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 网络流量监控 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header">网络流量监控</div>
+                <div class="card-body">
+                    <div id="trafficChart" class="echarts-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 磁盘IO监控 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header">磁盘IO监控</div>
+                <div class="card-body">
+                    <div id="diskIOChart" class="echarts-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const colors = ["#1e90ff", "#e0e0e0"];
+
+    function getCurrentTime() {
+        const now = new Date();
+        const h = now.getHours().toString().padStart(2, "0");
+        const m = now.getMinutes().toString().padStart(2, "0");
+        const s = now.getSeconds().toString().padStart(2, "0");
+        return `${h}:${m}:${s}`;
+    }
+
+    function formatBytes(bytes) {
+        if (bytes === 0) return "0";
+        const units = ["B", "KB", "MB", "GB", "TB"];
+        const i = Math.floor(Math.log(bytes) / Math.log(1024));
+        return (bytes / Math.pow(1024, i)).toFixed(2) + " " + units[i];
+    }
+
+
+    function formatUptime(seconds) {
+        if (seconds === 0) return "0秒";
+        const days = Math.floor(seconds / (24 * 3600));
+        const hours = Math.floor((seconds % (24 * 3600)) / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        let res = "";
+        if (days > 0) res += days + "天 ";
+        if (hours > 0) res += hours + "小时 ";
+        if (minutes > 0) res += minutes + "分钟";
+        return res.trim();
+    }
+
+    function showError(msg) {
+        const alertEl = document.getElementById("errorAlert");
+        const msgEl = document.getElementById("errorMessage");
+        msgEl.textContent = msg;
+        alertEl.classList.remove("d-none");
+        setTimeout(() => alertEl.classList.add("d-none"), 3000);
+    }
+
+    // 创建环形图
+    function createGaugeChart(id, value) {
+        const chart = echarts.init(document.getElementById(id));
+        const option = {
+            series: [{
+                type: 'gauge',
+                startAngle: 180,
+                endAngle: 0,
+                radius: '100%',
+                pointer: {
+                    show: false
+                },
+                progress: {
+                    show: true,
+                    overlap: false,
+                    roundCap: true,
+                    clip: false,
+                    itemStyle: {
+                        color: '#1e90ff'
+                    }
+                },
+                axisLine: {
+                    lineStyle: {
+                        width: 20,
+                        color: [
+                            [1, '#e0e0e0']
+                        ]
+                    }
+                },
+                splitLine: {
+                    show: false
+                },
+                axisTick: {
+                    show: false
+                },
+                axisLabel: {
+                    show: false
+                },
+                detail: {
+                    valueAnimation: true,
+                    offsetCenter: [0, 0],
+                    formatter: '{value}%',
+                    fontSize: 20,
+                    fontWeight: 'bold',
+                    color: '#000'
+                },
+                data: [{
+                    value: value || 0,
+                    name: ''
+                }]
+            }]
+        };
+        chart.setOption(option);
+        return chart;
+    }
+
+    // 初始化环形图
+    const cpuChart = createGaugeChart("cpuChart", 0);
+    const memoryChart = createGaugeChart("memoryChart", 0);
+    const processChart = createGaugeChart("processChart", 0);
+
+    // 初始化折线图数据
+    const initialLabels = Array.from({length: 10}, (_, i) => {
+        const time = new Date();
+        time.setSeconds(time.getSeconds() - (9 - i) * 5);
+        return time.toTimeString().slice(0, 8);
+    });
+
+    const initialTrafficData = Array.from({length: 10}, () => ({
+        upload: Math.floor(Math.random() * 50 * 1024),
+        download: Math.floor(Math.random() * 100 * 1024)
+    }));
+
+    const initialDiskIOData = Array.from({length: 10}, () => ({
+        read: Math.floor(Math.random() * 50 * 1024),
+        write: Math.floor(Math.random() * 100 * 1024)
+    }));
+
+    // 创建初始数据的副本，避免直接修改原数组
+    let trafficDataArray = JSON.parse(JSON.stringify(initialTrafficData));
+    let diskIODataArray = JSON.parse(JSON.stringify(initialDiskIOData));
+    // 初始化时间戳为0，用于判断首次数据获取
+    let prevNetSent = 0, prevNetRecv = 0, prevIORead = 0, prevIOWrite = 0, prevTimestamp = 0;
+
+    // 创建流量折线图
+    const trafficChart = echarts.init(document.getElementById('trafficChart'));
+    const trafficOption = {
+        tooltip: {
+            trigger: 'axis',
+            formatter: function (params) {
+                let result = `时间: ${params[0].axisValue}<br/>`;
+                params.forEach(item => {
+                    const value = (item.value / 1024).toFixed(2);
+                    result += `${item.marker} ${item.seriesName}: ${value} KB/s<br/>`;
+                });
+                return result;
+            }
+        },
+        legend: {
+            data: ['上行流量', '下行流量'],
+            top: 0
+        },
+        grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '3%',
+            top: '25%',
+            containLabel: true
+        },
+        xAxis: {
+            type: 'category',
+            boundaryGap: false,
+            data: initialLabels
+        },
+        yAxis: {
+            type: 'value',
+            name: 'KB/s',
+            axisLabel: {
+                formatter: function (value) {
+                    return (value / 1024).toFixed(2);
+                }
+            }
+        },
+        series: [
+            {
+                name: '上行流量',
+                type: 'line',
+                data: initialTrafficData.map(item => item.upload),
+                smooth: true,
+                lineStyle: {
+                    color: '#28a745'
+                },
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        {offset: 0, color: 'rgba(40,167,69,0.5)'},
+                        {offset: 1, color: 'rgba(40,167,69,0.1)'}
+                    ])
+                }
+            },
+            {
+                name: '下行流量',
+                type: 'line',
+                data: initialTrafficData.map(item => item.download),
+                smooth: true,
+                lineStyle: {
+                    color: '#ffc107'
+                },
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        {offset: 0, color: 'rgba(255,193,7,0.5)'},
+                        {offset: 1, color: 'rgba(255,193,7,0.1)'}
+                    ])
+                }
+            }
+        ]
+    };
+    trafficChart.setOption(trafficOption);
+
+    // 创建磁盘IO折线图
+    const diskIOChart = echarts.init(document.getElementById('diskIOChart'));
+    const diskIOOption = {
+        tooltip: {
+            trigger: 'axis',
+            formatter: function (params) {
+                let result = `时间: ${params[0].axisValue}<br/>`;
+                params.forEach(item => {
+                    const value = (item.value / 1024 / 1024).toFixed(2);
+                    result += `${item.marker} ${item.seriesName}: ${value} MB/s<br/>`;
+                });
+                return result;
+            }
+        },
+        legend: {
+            data: ['读取速度', '写入速度'],
+            top: 0
+        },
+        grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '3%',
+            top: '25%',
+            containLabel: true
+        },
+        xAxis: {
+            type: 'category',
+            boundaryGap: false,
+            data: initialLabels
+        },
+        yAxis: {
+            type: 'value',
+            name: 'MB/s',
+            axisLabel: {
+                formatter: function (value) {
+                    return (value / 1024 / 1024).toFixed(2);
+                }
+            }
+        },
+        series: [
+            {
+                name: '读取速度',
+                type: 'line',
+                data: initialDiskIOData.map(item => item.read),
+                smooth: true,
+                lineStyle: {
+                    color: '#17a2b8'
+                },
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        {offset: 0, color: 'rgba(23,162,184,0.5)'},
+                        {offset: 1, color: 'rgba(23,162,184,0.1)'}
+                    ])
+                }
+            },
+            {
+                name: '写入速度',
+                type: 'line',
+                data: initialDiskIOData.map(item => item.write),
+                smooth: true,
+                lineStyle: {
+                    color: '#dc3545'
+                },
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        {offset: 0, color: 'rgba(220,53,69,0.5)'},
+                        {offset: 1, color: 'rgba(220,53,69,0.1)'}
+                    ])
+                }
+            }
+        ]
+    };
+    diskIOChart.setOption(diskIOOption);
+
+    // 基本信息
+    async function fetchBaseInfo() {
+        try {
+            const res = await fetch("/base", { credentials: 'include' });
+            if (!res.ok) throw new Error("Network response was not ok");
+            const data = await res.json();
+            updateBaseInfo(data);
+        } catch (e) {
+            showError("获取基本信息失败: " + e.message);
+        }
+    }
+
+    function updateBaseInfo(data) {
+        document.getElementById("hostname").textContent = data.hostname;
+        document.getElementById("ipAddr").textContent = data.ipV4Addr;
+        document.getElementById("os").textContent = data.os;
+        document.getElementById("platformVersion").textContent = data.platformVersion;
+        document.getElementById("kernelVersion").textContent = data.kernelVersion;
+        document.getElementById("kernelArch").textContent = data.kernelArch;
+        document.getElementById("systemProxy").textContent = data.systemProxy;
+        document.getElementById("cpuModelName").textContent = data.cpuModelName;
+        document.getElementById("cpuCores").textContent = data.cpuCores;
+        document.getElementById("cpuLogicalCores").textContent = data.cpuLogicalCores;
+        document.getElementById("cpuMhz").textContent = data.cpuMhz.toFixed(2);
+    }
+
+    // 当前状态
+    async function fetchCurrentInfo() {
+        try {
+            const res = await fetch("/current", { credentials: 'include' });
+            if (!res.ok) throw new Error("Network response was not ok");
+            const data = await res.json();
+            updateCurrentInfo(data);
+        } catch (e) {
+            showError("获取实时信息失败: " + e.message);
+        }
+    }
+
+    function updateCurrentInfo(data) {
+        document.getElementById("uptime").textContent = formatUptime(data.uptime);
+        const cpuPercent = Math.round(data.cpuUsedPercent);
+        cpuChart.setOption({series: [{data: [{value: cpuPercent}]}]});
+        const loadPercent = Math.round(data.loadUsagePercent);
+        processChart.setOption({series: [{data: [{value: loadPercent}]}]});
+        const memPercent = Math.round(data.memoryUsedPercent);
+        memoryChart.setOption({series: [{data: [{value: memPercent}]}]});
+
+
+        // 更新磁盘表格
+        updateDiskTable(data.diskData);
+
+        const now = Date.now();
+        const diff = now - prevTimestamp;
+
+        // 第一次获取数据时，只保存初始值，不计算速度
+        if (prevTimestamp === 0) {
+            prevNetSent = data.netBytesSent;
+            prevNetRecv = data.netBytesRecv;
+            prevIORead = data.ioReadBytes;
+            prevIOWrite = data.ioWriteBytes;
+            prevTimestamp = now;
+        } else if (diff >= 1000) {
+            const upload = (data.netBytesSent - prevNetSent) / (diff / 1000);
+            const download = (data.netBytesRecv - prevNetRecv) / (diff / 1000);
+            const read = (data.ioReadBytes - prevIORead) / (diff / 1000);
+            const write = (data.ioWriteBytes - prevIOWrite) / (diff / 1000);
+
+            prevNetSent = data.netBytesSent;
+            prevNetRecv = data.netBytesRecv;
+            prevIORead = data.ioReadBytes;
+            prevIOWrite = data.ioWriteBytes;
+            prevTimestamp = now;
+
+            trafficDataArray.push({upload, download});
+            if (trafficDataArray.length > 10) trafficDataArray.shift();
+            diskIODataArray.push({read, write});
+            if (diskIODataArray.length > 10) diskIODataArray.shift();
+        }
+    }
+
+    // 更新磁盘表格
+    function updateDiskTable(diskData) {
+        const tbody = document.getElementById("diskTableBody");
+        tbody.innerHTML = "";
+
+        if (!diskData || diskData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center">暂无磁盘数据</td></tr>';
+            return;
+        }
+
+        for (const disk of diskData) {
+            const row = document.createElement("tr");
+
+            // 设备名称
+            const deviceCell = document.createElement("td");
+            deviceCell.textContent = disk.device || "未知";
+            row.appendChild(deviceCell);
+
+            // 文件系统
+            const fsCell = document.createElement("td");
+            fsCell.textContent = disk.type || "未知";
+            row.appendChild(fsCell);
+
+            // 挂载路径
+            const pathCell = document.createElement("td");
+            pathCell.textContent = disk.path || "未知";
+            row.appendChild(pathCell);
+
+            // 总容量
+            const totalCell = document.createElement("td");
+            totalCell.textContent = formatBytes(disk.total);
+            row.appendChild(totalCell);
+
+            // 已用空间
+            const usedCell = document.createElement("td");
+            usedCell.textContent = formatBytes(disk.used);
+            row.appendChild(usedCell);
+
+            // 可用空间
+            const freeCell = document.createElement("td");
+            freeCell.textContent = formatBytes(disk.free);
+            row.appendChild(freeCell);
+
+            // 使用率
+            const usageCell = document.createElement("td");
+            const usagePercent = Math.round(disk.usedPercent) || 0;
+            const usageBar = document.createElement("div");
+            usageBar.className = "progress progress-sm mb-0";
+
+            // 根据使用率确定颜色
+            let usageLevel = "low";
+            if (usagePercent >= 80) usageLevel = "high";
+            else if (usagePercent >= 50) usageLevel = "medium";
+
+            usageBar.innerHTML = `
+                <div class="progress-bar" data-usage="${usageLevel}" role="progressbar" style="width: ${usagePercent}%" 
+                     aria-valuenow="${usagePercent}" aria-valuemin="0" aria-valuemax="100">
+                    ${usagePercent}%
+                </div>
+            `;
+            usageCell.appendChild(usageBar);
+            row.appendChild(usageCell);
+
+            // Inode使用率
+            const inodeCell = document.createElement("td");
+            const inodePercent = Math.round(disk.inodesUsedPercent) || 0;
+            const inodeBar = document.createElement("div");
+            inodeBar.className = "progress progress-sm mb-0";
+
+            // 根据inode使用率确定颜色
+            let inodeLevel = "low";
+            if (inodePercent >= 80) inodeLevel = "high";
+            else if (inodePercent >= 50) inodeLevel = "medium";
+
+            inodeBar.innerHTML = `
+                <div class="progress-bar" data-usage="${inodeLevel}" role="progressbar" style="width: ${inodePercent}%" 
+                     aria-valuenow="${inodePercent}" aria-valuemin="0" aria-valuemax="100">
+                    ${inodePercent}%
+                </div>
+            `;
+            inodeCell.appendChild(inodeBar);
+            row.appendChild(inodeCell);
+
+            tbody.appendChild(row);
+        }
+    }
+
+    // 请求并显示进程列表
+    async function fetchAndShowProcessList(endpoint, title) {
+        try {
+            // 更新模态框标题
+            document.getElementById("processListModalLabel").textContent = title;
+
+            // 显示加载状态
+            const tbody = document.getElementById("processListBody");
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">加载中...</td></tr>';
+
+            const res = await fetch(endpoint, { credentials: 'include' });
+            if (!res.ok) throw new Error("Network response was not ok");
+            const data = await res.json();
+            updateProcessList(data);
+        } catch (e) {
+            showError("获取进程列表失败: " + e.message);
+            // 更新模态框显示错误信息
+            const tbody = document.getElementById("processListBody");
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">获取进程列表失败</td></tr>';
+        }
+    }
+
+    // 更新进程列表到模态框
+    function updateProcessList(processList) {
+        const tbody = document.getElementById("processListBody");
+        tbody.innerHTML = "";
+
+        if (!processList || processList.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">暂无进程数据</td></tr>';
+            return;
+        }
+
+        for (const process of processList) {
+            const row = document.createElement("tr");
+
+            // PID
+            const pidCell = document.createElement("td");
+            pidCell.textContent = process.pid || "-";
+            row.appendChild(pidCell);
+
+            // 用户
+            const userCell = document.createElement("td");
+            userCell.textContent = process.user || "-";
+            row.appendChild(userCell);
+
+            // CPU%
+            const cpuCell = document.createElement("td");
+            cpuCell.textContent = (process.percent || 0).toFixed(1) + "%";
+            row.appendChild(cpuCell);
+
+            // 物理内存
+            const rssCell = document.createElement("td");
+            rssCell.textContent = formatBytes(process.memory || 0);
+            row.appendChild(rssCell);
+
+            // 命令
+            const commandCell = document.createElement("td");
+            commandCell.textContent = process.cmd || "-";
+
+            row.appendChild(commandCell);
+
+            tbody.appendChild(row);
+        }
+    }
+
+    function updateTrafficData() {
+        // 更新流量图
+        const newTime = getCurrentTime();
+        const latestTraffic = trafficDataArray[trafficDataArray.length - 1] || {upload: 0, download: 0};
+
+        // 更新流量图数据
+        trafficChart.setOption({
+            xAxis: {
+                data: [...trafficOption.xAxis.data.slice(1), newTime]
+            },
+            series: [
+                {
+                    data: [...trafficOption.series[0].data.slice(1), latestTraffic.upload]
+                },
+                {
+                    data: [...trafficOption.series[1].data.slice(1), latestTraffic.download]
+                }
+            ]
+        });
+
+        // 更新磁盘IO图数据
+        const latestDiskIO = diskIODataArray[diskIODataArray.length - 1] || {read: 0, write: 0};
+        diskIOChart.setOption({
+            xAxis: {
+                data: [...diskIOOption.xAxis.data.slice(1), newTime]
+            },
+            series: [
+                {
+                    data: [...diskIOOption.series[0].data.slice(1), latestDiskIO.read]
+                },
+                {
+                    data: [...diskIOOption.series[1].data.slice(1), latestDiskIO.write]
+                }
+            ]
+        });
+
+        // 更新选项对象中的数据引用
+        trafficOption.xAxis.data = trafficChart.getOption().xAxis[0].data;
+        trafficOption.series[0].data = trafficChart.getOption().series[0].data;
+        trafficOption.series[1].data = trafficChart.getOption().series[1].data;
+
+        diskIOOption.xAxis.data = diskIOChart.getOption().xAxis[0].data;
+        diskIOOption.series[0].data = diskIOChart.getOption().series[0].data;
+        diskIOOption.series[1].data = diskIOChart.getOption().series[1].data;
+    }
+    fetchBaseInfo();
+    fetchCurrentInfo();
+    setInterval(fetchCurrentInfo, 3000);
+    setInterval(updateTrafficData, 5000);
+
+    // 窗口大小调整时重绘图表
+    window.addEventListener('resize', function () {
+        cpuChart.resize();
+        memoryChart.resize();
+        processChart.resize();
+        trafficChart.resize();
+        diskIOChart.resize();
+    });
+
+    // CPU图表点击事件 - 显示进程列表
+    document.querySelector('#cpuChart').addEventListener('click', function () {
+        // 显示模态框
+        const myModal = new bootstrap.Modal(document.getElementById('processListModal'));
+        myModal.show();
+
+        // 请求CPU进程列表数据
+        fetchAndShowProcessList('/top/cpu/ps', 'CPU进程列表');
+    });
+
+    // 内存图表点击事件 - 显示进程列表
+    document.querySelector('#memoryChart').addEventListener('click', function () {
+        // 显示模态框
+        const myModal = new bootstrap.Modal(document.getElementById('processListModal'));
+        myModal.show();
+
+        // 请求内存进程列表数据
+        fetchAndShowProcessList('/top/mem/ps', '内存进程列表');
+    });
+</script>
+<!-- 进程列表模态框 -->
+<div class="modal fade" id="processListModal" tabindex="-1" aria-labelledby="processListModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="processListModalLabel">CPU进程列表</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="processListTable">
+                        <thead>
+                        <tr>
+                            <th>PID</th>
+                            <th>用户</th>
+                            <th>CPU%</th>
+                            <th>物理内存</th>
+                            <th>命令</th>
+                        </tr>
+                        </thead>
+                        <tbody id="processListBody">
+                        <tr>
+                            <td colspan="5" class="text-center">加载中...</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

@@ -2,12 +2,12 @@ package main
 
 import (
 	"chihqiang/hoststat/handles"
-	"chihqiang/hoststat/logx"
 	"chihqiang/hoststat/token"
 	"context"
 	"embed"
 	"errors"
 	"fmt"
+	"github.com/chihqiang/logx"
 	"html/template"
 	"net/http"
 	"os"

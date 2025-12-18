@@ -3,12 +3,13 @@ module chihqiang/hoststat
 go 1.24.0
 
 require (
-	github.com/fatih/color v1.18.0
+	github.com/chihqiang/logx v0.0.0-20251218085236-fa4e219d0ac9
 	github.com/shirou/gopsutil/v4 v4.25.11
 )
 
 require (
 	github.com/ebitengine/purego v0.9.1 // indirect
+	github.com/fatih/color v1.18.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect

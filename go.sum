@@ -1,3 +1,5 @@
+github.com/chihqiang/logx v0.0.0-20251218085236-fa4e219d0ac9 h1:Si1zXWNQD67AGY//bDPUZybiapjwDah+JuKsWSkx4UI=
+github.com/chihqiang/logx v0.0.0-20251218085236-fa4e219d0ac9/go.mod h1:Ti/Rm0FhuaMqMwaTkKBUXf42PTwhjJPXbqebcIVfWU8=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/ebitengine/purego v0.9.1 h1:a/k2f2HQU3Pi399RPW1MOaZyhKJL9w/xFpKAg4q1s0A=
